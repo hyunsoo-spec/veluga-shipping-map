@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>출고 지도</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; background: #f3f4f6; color: #111827; }
+    .layout { display: grid; grid-template-columns: 1fr 390px; height: 100vh; width: 100vw; }
+    #map { width: 100%; height: 100%; background: #e5e7eb; }
+    .panel { height: 100vh; overflow: auto; background: #fff; border-left: 1px solid #d1d5db; padding: 14px; }
+    .title { font-size: 18px; font-weight: 900; margin-bottom: 6px; }
+    .subtitle { font-size: 12px; color: #6b7280; margin-bottom: 12px; line-height: 1.4; }
+    .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+    .kpi { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px; background: #f9fafb; }
+    .kpi-label { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
+    .kpi-value { font-size: 20px; font-weight: 900; }
+    .section-title { font-size: 12px; font-weight: 900; margin: 10px 0 6px; }
+    .zone-section { margin-bottom: 12px; }
+    .zone-list { display: flex; flex-direction: column; gap: 6px; max-height: 235px; overflow: auto; padding-right: 2px; }
+    .zone-summary { border: 1px solid #e5e7eb; background: #f9fafb; border-radius: 12px; padding: 10px; font-size: 12px; line-height: 1.45; margin: 8px 0 12px; }
+    .zone-summary strong { font-size: 16px; }
+    .zone-pill { border: 1px solid #e5e7eb; border-radius: 12px; padding: 9px 10px; background: #fff; cursor: pointer; }
+    .zone-pill:hover { background: #f9fafb; border-color: #9ca3af; }
+    .zone-pill.active { background: #111827; color: #fff; border-color: #111827; }
+    .zone-pill-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 3px; }
+    .zone-name { font-size: 13px; font-weight: 900; }
+    .zone-rec { font-size: 10px; font-weight: 900; border-radius: 999px; padding: 2px 6px; background: #e5e7eb; color: #374151; white-space: nowrap; }
+    .zone-rec.strong { background: #dcfce7; color: #166534; }
+    .zone-rec.warn { background: #fee2e2; color: #991b1b; }
+    .zone-rec.normal { background: #dbeafe; color: #1d4ed8; }
+    .zone-pill.active .zone-rec { background: #fff; color: #111827; }
+    .zone-meta { font-size: 11px; line-height: 1.35; color: #6b7280; }
+    .zone-pill.active .zone-meta { color: #e5e7eb; }
+    .filters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+    button { border: 1px solid #d1d5db; background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 12px; font-weight: 800; }
+    button.active { background: #111827; color: #fff; border-color: #111827; }
+    .legend { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 12px; margin-bottom: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; color: #374151; }
+    .dot { width: 11px; height: 11px; border-radius: 999px; display: inline-block; }
+    .list { display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px; background: #fff; cursor: pointer; }
+    .card:hover { border-color: #9ca3af; background: #f9fafb; }
+    .card-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .store { font-size: 13px; font-weight: 900; }
+    .badge { font-size: 11px; font-weight: 900; border-radius: 999px; padding: 3px 7px; white-space: nowrap; }
+    .meta { font-size: 12px; color: #4b5563; line-height: 1.4; }
+    .memo { margin-top: 5px; font-size: 11px; color: #6b7280; line-height: 1.35; }
+    .marker-wrap { position: relative; width: 18px; height: 18px; cursor: pointer; z-index: 20; }
+    .marker-dot { width: 16px; height: 16px; border-radius: 999px; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); transition: transform .12s ease, box-shadow .12s ease; }
+    .marker-tip { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); background: #111827; color: #fff; font-size: 12px; font-weight: 900; padding: 6px 8px; border-radius: 8px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s ease; box-shadow: 0 4px 12px rgba(0,0,0,.25); z-index: 9999; }
+    .marker-wrap:hover .marker-tip { opacity: 1; }
+    .marker-wrap:hover .marker-dot { transform: scale(1.35); box-shadow: 0 4px 12px rgba(0,0,0,.45); }
+    body.labels-always .marker-tip { opacity: 1; background: rgba(17,24,39,.86); }
+    body.labels-always .marker-wrap { z-index: 40; }
+    body.map-minimal #map { background: #eef2f7 !important; }
+    body.map-minimal #map img { filter: grayscale(1) saturate(.15) contrast(1.15) brightness(1.18); opacity: .48 !important; }
+    body.map-minimal .marker-dot { width: 19px; height: 19px; border: 3px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,.45); }
+    .zone-map-label { background: rgba(17,24,39,.92); color: #fff; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 900; white-space: nowrap; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+    .today { background: #16a34a; } .pull { background: #2563eb; } .issue { background: #dc2626; } .local { background: #f59e0b; color: #111827; } .unknown { background: #6b7280; }
+    .badge.today { background: #dcfce7; color: #166534; } .badge.pull { background: #dbeafe; color: #1d4ed8; } .badge.issue { background: #fee2e2; color: #991b1b; } .badge.local { background: #fef3c7; color: #92400e; } .badge.unknown { background: #e5e7eb; color: #374151; }
+    .error { padding: 16px; color: #991b1b; background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; margin: 14px; line-height: 1.5; }
+    .loading { padding: 16px; color: #374151; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; margin: 14px; line-height: 1.5; font-weight: 800; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; grid-template-rows: 56vh 44vh; } .panel { height: 44vh; border-left: none; border-top: 1px solid #d1d5db; } }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div id="map"></div>
+    <aside class="panel">
+      <div class="title">출고 지도</div>
+      <div class="subtitle">권역별로 오늘확정 / 당겨오기 / 확인필요 주문을 지도에 표시합니다.<br>데이터는 Google Sheets에서 갱신한 값을 불러옵니다.</div>
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">전체</div><div class="kpi-value" id="kpiTotal">-</div></div>
+        <div class="kpi"><div class="kpi-label">오늘확정</div><div class="kpi-value" id="kpiToday">-</div></div>
+        <div class="kpi"><div class="kpi-label">당겨오기</div><div class="kpi-value" id="kpiPull">-</div></div>
+        <div class="kpi"><div class="kpi-label">확인필요</div><div class="kpi-value" id="kpiIssue">-</div></div>
+      </div>
+      <div class="zone-section">
+        <div class="section-title">권역 선택</div>
+        <div class="zone-list" id="zoneList"></div>
+        <div class="zone-summary" id="zoneSummary">권역을 선택하면 예상 소요시간이 표시됩니다.</div>
+      </div>
+      <div class="filters">
+        <button id="filterAll" class="active" onclick="setFilter('전체')">전체</button>
+        <button id="filterToday" onclick="setFilter('오늘확정')">오늘확정</button>
+        <button id="filterPull" onclick="setFilter('당겨오기')">당겨오기</button>
+        <button id="filterIssue" onclick="setFilter('확인필요')">확인필요</button>
+        <button id="toggleLocal" class="active" onclick="toggleLocal()">지방권 포함</button>
+        <button id="toggleTraffic" onclick="toggleTraffic()">교통 ON</button>
+        <button id="toggleMinimal" onclick="toggleMinimalMap()">권역지도</button>
+        <button id="toggleLabels" onclick="toggleLabelsAlways()">상호명 표시</button>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="dot today"></span>오늘확정</div>
+        <div class="legend-item"><span class="dot pull"></span>당겨오기</div>
+        <div class="legend-item"><span class="dot issue"></span>확인필요</div>
+        <div class="legend-item"><span class="dot local"></span>지방권</div>
+      </div>
+      <div class="list" id="list"><div class="loading">지도 데이터를 불러오는 중...</div></div>
+    </aside>
+  </div>
+<script>
+let KAKAO_JS_KEY='', DATA_URL='';
+let map, payload, overlays=[], zoneShapes=[];
+let activeFilter='전체', activeZone='전체권역', includeLocal=true, trafficOn=false, minimalMap=false, labelsAlways=false;
+const typeClassMap={'오늘확정':'today','당겨오기':'pull','확인필요':'issue'};
+function getQueryParam(name){return new URLSearchParams(window.location.search).get(name)||'';}
+function boot(){KAKAO_JS_KEY=getQueryParam('appkey'); DATA_URL=getQueryParam('dataUrl'); if(!KAKAO_JS_KEY){showError('appkey 파라미터가 없습니다. Google Sheets 버튼 URL 설정을 확인하세요.'); return;} if(!DATA_URL){showError('dataUrl 파라미터가 없습니다. Google Sheets 버튼 URL 설정을 확인하세요.'); return;} loadKakaoSdkThenLoadData();}
+function loadKakaoSdkThenLoadData(){const script=document.createElement('script'); script.src='https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey='+encodeURIComponent(KAKAO_JS_KEY); script.onload=function(){if(!window.kakao||!kakao.maps){showError('Kakao 지도 SDK 로드 실패.<br><br>현재 origin: '+escapeHtml(location.origin));return;} kakao.maps.load(function(){loadPayload();});}; script.onerror=function(){showError('Kakao 지도 SDK script 로드 실패.<br><br>현재 origin: '+escapeHtml(location.origin)+'<br><br>이 도메인을 Kakao Developers의 JavaScript SDK 도메인에 등록해야 합니다.');}; document.head.appendChild(script);}
+function loadPayload(){jsonp(DATA_URL,function(data){if(!data||data.ok===false){showError('데이터 로드 실패: '+escapeHtml(data&&data.error?data.error:'unknown'));return;} payload=data; initMap(data); render();},function(message){showError('데이터 로드 실패: '+escapeHtml(message));});}
+function jsonp(url,onSuccess,onError){const callbackName='__shippingMapCallback_'+Date.now()+'_'+Math.floor(Math.random()*100000); window[callbackName]=function(data){cleanup(); onSuccess(data);}; const script=document.createElement('script'); script.src=appendQuery(url,'callback',callbackName); script.onerror=function(){cleanup(); onError('JSONP script 로드 실패. Apps Script 웹앱 배포 권한 또는 dataUrl을 확인하세요.');}; function cleanup(){try{delete window[callbackName];}catch(e){window[callbackName]=undefined;} if(script.parentNode)script.parentNode.removeChild(script);} document.body.appendChild(script);}
+function appendQuery(url,key,value){const joiner=url.indexOf('?')>=0?'&':'?'; return url+joiner+encodeURIComponent(key)+'='+encodeURIComponent(value);}
+function initMap(data){const settings=data.settings||{}; const center=new kakao.maps.LatLng(Number(settings.centerLat)||37.5665,Number(settings.centerLng)||126.9780); map=new kakao.maps.Map(document.getElementById('map'),{center:center,level:Number(settings.level)||8}); const zoomControl=new kakao.maps.ZoomControl(); map.addControl(zoomControl,kakao.maps.ControlPosition.RIGHT);}
+function render(){if(!payload||!map)return; document.getElementById('kpiTotal').innerText=safeNumber(payload.counts.total); document.getElementById('kpiToday').innerText=safeNumber(payload.counts.today); document.getElementById('kpiPull').innerText=safeNumber(payload.counts.pull); document.getElementById('kpiIssue').innerText=safeNumber(payload.counts.issue); renderZones(); renderZoneSummary(); clearOverlays(); clearZoneShapes(); const visible=getVisibleMarkers(); renderZoneFrame(visible); renderMarkers(visible); renderList(visible); fitBounds(visible);}
+function renderZones(){const el=document.getElementById('zoneList'); if(!el||!payload)return; const zones=payload.zones||[]; let html=''; html+='<div class="zone-pill '+(activeZone==='전체권역'?'active':'')+'" onclick="setActiveZone(\'전체권역\')"><div class="zone-pill-top"><div class="zone-name">전체권역</div><div class="zone-rec">ALL</div></div><div class="zone-meta">전체 '+safeNumber(payload.counts.total)+'건 / 오늘 '+safeNumber(payload.counts.today)+'건 / 당겨오기 '+safeNumber(payload.counts.pull)+'건 / 확인필요 '+safeNumber(payload.counts.issue)+'건</div></div>'; zones.forEach(function(zone){const active=activeZone===zone.zoneName; const recClass=getZoneRecClass(zone.rec); const apiText=zone.apiMoveText?' / API '+escapeHtml(zone.apiMoveText):''; html+='<div class="zone-pill '+(active?'active':'')+'" onclick="setActiveZone(\''+escapeJs(zone.zoneName)+'\')"><div class="zone-pill-top"><div class="zone-name">'+escapeHtml(zone.zoneName)+'</div><div class="zone-rec '+recClass+'">'+escapeHtml(zone.rec||'-')+'</div></div><div class="zone-meta">총 '+safeNumber(zone.total)+'건 / 오늘 '+safeNumber(zone.today)+' / 당겨오기 '+safeNumber(zone.pull)+' / 확인필요 '+safeNumber(zone.issue)+'<br>예상 '+escapeHtml(zone.expectedText||'-')+apiText+' / 이동 '+escapeHtml(zone.moveText||'-')+'</div></div>';}); el.innerHTML=html;}
+function renderZoneSummary(){const el=document.getElementById('zoneSummary'); if(!el||!payload)return; const zones=payload.zones||[]; if(activeZone==='전체권역'){const totalExpectedMin=zones.reduce((s,z)=>s+(Number(z.expectedMin)||0),0); const totalMoveMin=zones.reduce((s,z)=>s+(Number(z.moveMin)||0),0); const totalStopMin=zones.reduce((s,z)=>s+(Number(z.stopMin)||0),0); const totalApiMoveMin=zones.reduce((s,z)=>s+(Number(z.apiMoveMin)||0),0); el.innerHTML='<strong>전체권역</strong><br>전체 '+safeNumber(payload.counts.total)+'건 / 오늘확정 '+safeNumber(payload.counts.today)+'건 / 당겨오기 '+safeNumber(payload.counts.pull)+'건 / 확인필요 '+safeNumber(payload.counts.issue)+'건<br>'+(totalApiMoveMin?'API 경유 이동시간 합계: <strong>'+escapeHtml(formatClientMinutes(totalApiMoveMin))+'</strong><br>':'')+'예상 총 작업시간: <strong>'+escapeHtml(formatClientMinutes(totalExpectedMin))+'</strong><br>예상 이동시간: '+escapeHtml(formatClientMinutes(totalMoveMin))+'<br>예상 정차시간: '+escapeHtml(formatClientMinutes(totalStopMin))+'<div class="memo">권역을 선택하면 해당 권역만 지도에 표시됩니다.</div>'; return;} const zone=zones.find(z=>z.zoneName===activeZone); if(!zone){el.innerHTML='선택한 권역 정보가 없습니다.';return;} el.innerHTML='<strong>'+escapeHtml(zone.zoneName)+'</strong><br>추천구분: '+escapeHtml(zone.rec||'-')+'<br>총 '+safeNumber(zone.total)+'건 / 오늘확정 '+safeNumber(zone.today)+'건 / 당겨오기 '+safeNumber(zone.pull)+'건 / 확인필요 '+safeNumber(zone.issue)+'건<br>총수량: '+escapeHtml(String(zone.qty||0))+'<br>예상 권역 작업시간: <strong>'+escapeHtml(zone.expectedText||'-')+'</strong><br>'+(zone.apiMoveText?'API 경유 이동시간: <strong>'+escapeHtml(zone.apiMoveText)+'</strong><br>API 이동거리: '+escapeHtml(zone.apiDistanceText||'-')+'<br>':'API 경유 이동시간: 계산 전<br>')+'예상 이동시간: <strong>'+escapeHtml(zone.moveText||'-')+'</strong><br>예상 정차시간: '+escapeHtml(zone.stopText||'-')+'<div class="memo">포함지역: '+escapeHtml(zone.regionsText||'-')+'<br>※ API 경유 이동시간은 Kakao Mobility 기준이며, 정차시간은 권역별 운영 기준값입니다.</div>';}
+function setActiveZone(zoneName){activeZone=zoneName||'전체권역'; render();}
+function getZoneRecClass(rec){if(rec==='강추천'||rec==='추천')return'strong'; if(rec==='확인필요')return'warn'; if(rec==='오늘권역'||rec==='미래후보')return'normal'; return'';}
+function getVisibleMarkers(){return(payload.markers||[]).filter(function(item){if(!item.lat||!item.lng||item.coordStatus!=='OK')return false; if(!includeLocal&&item.regionKey==='지방권')return false; if(activeFilter!=='전체'&&item.type!==activeFilter)return false; if(activeZone!=='전체권역'&&item.zoneName!==activeZone)return false; return true;});}
+function renderMarkers(items){items.forEach(function(item){const position=new kakao.maps.LatLng(item.lat,item.lng); const cls=getClassName(item); const content='<div class="marker-wrap" onclick="focusByOrderNo(\''+escapeJs(item.orderNo)+'\')"><div class="marker-tip">'+escapeHtml(item.storeName)+'</div><div class="marker-dot '+cls+'"></div></div>'; const overlay=new kakao.maps.CustomOverlay({position:position,content:content,yAnchor:1}); overlay.setMap(map); overlays.push(overlay);});}
+function renderList(items){const list=document.getElementById('list'); if(items.length===0){list.innerHTML='<div class="memo">표시할 마커가 없습니다.</div>'; return;} const sorted=items.slice().sort((a,b)=>String(a.zoneName).localeCompare(String(b.zoneName))||String(a.regionKey).localeCompare(String(b.regionKey))||String(a.type).localeCompare(String(b.type))||String(a.storeName).localeCompare(String(b.storeName))); list.innerHTML=sorted.map(function(item){const cls=getClassName(item); return '<div class="card" onclick="focusByOrderNo(\''+escapeJs(item.orderNo)+'\')"><div class="card-top"><div class="store">'+escapeHtml(item.storeName)+'</div><div class="badge '+cls+'">'+escapeHtml(item.type)+'</div></div><div class="meta">주문번호: '+escapeHtml(item.orderNo)+'<br>출고일: '+escapeHtml(item.shipDate)+' / 수량: '+escapeHtml(String(item.qty||''))+'<br>권역: '+escapeHtml(item.zoneName||'-')+'<br>지역: '+escapeHtml(item.regionKey)+'<br>'+escapeHtml(item.address)+'</div><div class="memo">'+escapeHtml(item.memo||'')+'</div></div>';}).join('');}
+function renderZoneFrame(items){if(!map||!items||items.length===0)return; if(activeZone==='전체권역')return; const points=items.filter(item=>item.lat&&item.lng&&item.coordStatus==='OK').map(item=>({lat:Number(item.lat),lng:Number(item.lng)})); if(points.length===0)return; const center=getPointsCenter(points); const label=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(center.lat,center.lng),content:'<div class="zone-map-label">'+escapeHtml(activeZone)+'</div>',yAnchor:1.8}); label.setMap(map); zoneShapes.push(label); if(points.length===1)return; if(points.length===2){const line=new kakao.maps.Polyline({path:points.map(p=>new kakao.maps.LatLng(p.lat,p.lng)),strokeWeight:4,strokeColor:'#111827',strokeOpacity:.75,strokeStyle:'solid'}); line.setMap(map); zoneShapes.push(line); return;} const hull=getConvexHull(points); const polygon=new kakao.maps.Polygon({path:hull.map(p=>new kakao.maps.LatLng(p.lat,p.lng)),strokeWeight:3,strokeColor:'#111827',strokeOpacity:.85,strokeStyle:'solid',fillColor:'#2563eb',fillOpacity:.08}); polygon.setMap(map); zoneShapes.push(polygon);}
+function getPointsCenter(points){const lat=points.reduce((sum,p)=>sum+p.lat,0)/points.length; const lng=points.reduce((sum,p)=>sum+p.lng,0)/points.length; return{lat,lng};}
+function getConvexHull(points){const pts=points.slice().sort((a,b)=>a.lng===b.lng?a.lat-b.lat:a.lng-b.lng); function cross(o,a,b){return(a.lng-o.lng)*(b.lat-o.lat)-(a.lat-o.lat)*(b.lng-o.lng);} const lower=[]; pts.forEach(function(p){while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop(); lower.push(p);}); const upper=[]; for(let i=pts.length-1;i>=0;i--){const p=pts[i]; while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop(); upper.push(p);} upper.pop(); lower.pop(); return lower.concat(upper);}
+function fitBounds(items){if(!items.length)return; if(items.length===1){const item=items[0]; map.setCenter(new kakao.maps.LatLng(item.lat,item.lng)); map.setLevel(5); return;} const bounds=new kakao.maps.LatLngBounds(); items.forEach(item=>bounds.extend(new kakao.maps.LatLng(item.lat,item.lng))); map.setBounds(bounds);}
+function focusByOrderNo(orderNo){const item=(payload.markers||[]).find(x=>String(x.orderNo)===String(orderNo)); if(item)focusItem(item);}
+function focusItem(item){if(!item.lat||!item.lng)return; map.panTo(new kakao.maps.LatLng(item.lat,item.lng)); map.setLevel(4);}
+function clearOverlays(){overlays.forEach(overlay=>overlay.setMap(null)); overlays=[];}
+function clearZoneShapes(){zoneShapes.forEach(shape=>shape.setMap(null)); zoneShapes=[];}
+function setFilter(type){activeFilter=type; ['filterAll','filterToday','filterPull','filterIssue'].forEach(id=>document.getElementById(id).classList.remove('active')); const idMap={'전체':'filterAll','오늘확정':'filterToday','당겨오기':'filterPull','확인필요':'filterIssue'}; document.getElementById(idMap[type]).classList.add('active'); render();}
+function toggleLocal(){includeLocal=!includeLocal; document.getElementById('toggleLocal').classList.toggle('active',includeLocal); document.getElementById('toggleLocal').innerText=includeLocal?'지방권 포함':'지방권 제외'; render();}
+function toggleTraffic(){if(!map)return; trafficOn=!trafficOn; if(trafficOn){map.addOverlayMapTypeId(kakao.maps.MapTypeId.TRAFFIC);}else{map.removeOverlayMapTypeId(kakao.maps.MapTypeId.TRAFFIC);} document.getElementById('toggleTraffic').classList.toggle('active',trafficOn); document.getElementById('toggleTraffic').innerText=trafficOn?'교통 OFF':'교통 ON';}
+function toggleMinimalMap(){minimalMap=!minimalMap; document.body.classList.toggle('map-minimal',minimalMap); if(map&&kakao.maps.MapTypeId.USE_DISTRICT){if(minimalMap){map.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);}else{map.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);}} const btn=document.getElementById('toggleMinimal'); btn.classList.toggle('active',minimalMap); btn.innerText=minimalMap?'일반지도':'권역지도'; render();}
+function toggleLabelsAlways(){labelsAlways=!labelsAlways; document.body.classList.toggle('labels-always',labelsAlways); const btn=document.getElementById('toggleLabels'); btn.classList.toggle('active',labelsAlways); btn.innerText=labelsAlways?'상호명 숨김':'상호명 표시';}
+function getClassName(item){if(item.regionKey==='지방권')return'local'; return typeClassMap[item.type]||'unknown';}
+function safeNumber(value){return Number(value||0).toLocaleString('ko-KR');}
+function formatClientMinutes(minutes){minutes=Number(minutes)||0; const h=Math.floor(minutes/60); const m=Math.round(minutes%60); if(h>0)return h+'시간 '+m+'분'; return m+'분';}
+function showError(message){document.body.innerHTML='<div class="error">'+message+'</div>';}
+function escapeHtml(value){return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');}
+function escapeJs(value){return String(value||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+window.onload=boot;
+</script>
+</body>
+</html>
