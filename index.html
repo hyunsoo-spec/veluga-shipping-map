@@ -603,9 +603,16 @@ function renderTreeLabelMarkers(items) {
 
     const point = projection.containerPointFromCoords(position);
     const labelSize = estimateLabelSize(item.storeName || '');
-    const labelPoint = findNonOverlappingLabelPoint(point, labelSize, placedRects);
+let labelPoint = findNonOverlappingLabelPoint(point, labelSize, placedRects);
 
-    if (!labelPoint) return;
+// 자리가 없어도 라벨은 무조건 표시
+// 최후 fallback: 점 바로 위에 표시
+if (!labelPoint) {
+  labelPoint = {
+    x: point.x,
+    y: point.y - 42
+  };
+}
 
     const rect = makeRectFromCenter(labelPoint.x, labelPoint.y, labelSize.w, labelSize.h);
     placedRects.push(rect);
@@ -706,7 +713,7 @@ function getLabelPriority(item) {
 
 
 function getTreeLabelLimit(items) {
-  // 적재확인용: 현재 필터에 걸린 착지는 전부 라벨 표시
+  // 적재확인용: 현재 지도에 찍히는 모든 착지 라벨 표시
   return items.length;
 }
 
@@ -749,7 +756,7 @@ function findNonOverlappingLabelPoint(point, size, placedRects) {
     [-0.55, -0.95]
   ];
 
-  const distances = [30, 44, 62, 84, 112, 148, 190, 240, 300, 370, 450];
+  const distances = [28, 42, 58, 78, 104, 136, 176, 224, 284, 356, 440, 540];
 
   let bestCandidate = null;
   let bestScore = Infinity;
@@ -767,24 +774,25 @@ function findNonOverlappingLabelPoint(point, size, placedRects) {
 
       const rect = makeRectFromCenter(candidate.x, candidate.y, size.w, size.h);
 
-      if (!isRectInsideMap(rect)) continue;
+      let outsidePenalty = 0;
+      if (!isRectInsideMap(rect)) {
+        outsidePenalty = 100000;
+      }
 
       let collisionScore = 0;
 
       placedRects.forEach(function(existing) {
-        if (rectsOverlap(rect, existing, 10)) {
+        if (rectsOverlap(rect, existing, 8)) {
           collisionScore += getRectOverlapArea(rect, existing);
         }
       });
 
-      // 충돌 없는 자리면 바로 채택
-      if (collisionScore === 0) {
+      if (outsidePenalty === 0 && collisionScore === 0) {
         return candidate;
       }
 
-      // 모든 자리가 충돌하면, 가장 덜 겹치는 자리라도 사용
-      const distancePenalty = dist * 0.02;
-      const score = collisionScore + distancePenalty;
+      const distancePenalty = dist * 0.03;
+      const score = outsidePenalty + collisionScore + distancePenalty;
 
       if (score < bestScore) {
         bestScore = score;
@@ -793,6 +801,7 @@ function findNonOverlappingLabelPoint(point, size, placedRects) {
     }
   }
 
+  // 완벽한 자리가 없어도 가장 덜 나쁜 위치 반환
   return bestCandidate;
 }
 
@@ -835,6 +844,13 @@ function rectsOverlap(a, b, pad) {
   );
 }
 
+function getRectOverlapArea(a, b) {
+  const xOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+  const yOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+
+  return xOverlap * yOverlap;
+}
+  
 function getRectOverlapArea(a, b) {
   const xOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
   const yOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
