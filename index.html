@@ -225,12 +225,16 @@ function render() {
   clearOverlays();
   clearZoneShapes();
 
-  const visible = getVisibleMarkers();
+  // 카드용: 좌표 없어도 보여줌
+  const visibleCards = getFilteredItems(false);
 
-  renderZoneFrame(visible);
-  renderMarkers(visible);
-  renderList(visible);
-  fitBounds(visible);
+  // 지도용: 좌표 OK인 것만 찍음
+  const visibleMapMarkers = getFilteredItems(true);
+
+  renderZoneFrame(visibleMapMarkers);
+  renderMarkers(visibleMapMarkers);
+  renderList(visibleCards);
+  fitBounds(visibleMapMarkers);
 }
   
 function renderZones(){const el=document.getElementById('zoneList'); if(!el||!payload)return; const zones=payload.zones||[]; let html=''; html+='<div class="zone-pill '+(activeZone==='전체권역'?'active':'')+'" onclick="setActiveZone(\'전체권역\')"><div class="zone-pill-top"><div class="zone-name">전체권역</div><div class="zone-rec">ALL</div></div><div class="zone-meta">전체 '+safeNumber(payload.counts.total)+'건 / 오늘 '+safeNumber(payload.counts.today)+'건 / 당겨오기 '+safeNumber(payload.counts.pull)+'건 / 확인필요 '+safeNumber(payload.counts.issue)+'건</div></div>'; zones.forEach(function(zone){const active=activeZone===zone.zoneName; const recClass=getZoneRecClass(zone.rec); const apiText=zone.apiMoveText?' / API '+escapeHtml(zone.apiMoveText):''; html+='<div class="zone-pill '+(active?'active':'')+'" onclick="setActiveZone(\''+escapeJs(zone.zoneName)+'\')"><div class="zone-pill-top"><div class="zone-name">'+escapeHtml(zone.zoneName)+'</div><div class="zone-rec '+recClass+'">'+escapeHtml(zone.rec||'-')+'</div></div><div class="zone-meta">총 '+safeNumber(zone.total)+'건 / 오늘 '+safeNumber(zone.today)+' / 당겨오기 '+safeNumber(zone.pull)+' / 확인필요 '+safeNumber(zone.issue)+'<br>예상 '+escapeHtml(zone.expectedText||'-')+apiText+' / 이동 '+escapeHtml(zone.moveText||'-')+'</div></div>';}); el.innerHTML=html;}
@@ -238,9 +242,9 @@ function renderZoneSummary(){const el=document.getElementById('zoneSummary'); if
 function setActiveZone(zoneName){activeZone=zoneName||'전체권역'; render();}
 function getZoneRecClass(rec){if(rec==='강추천'||rec==='추천')return'strong'; if(rec==='확인필요')return'warn'; if(rec==='오늘권역'||rec==='미래후보')return'normal'; return'';}
 
-function getVisibleMarkers() {
+function getFilteredItems(requireCoordOk) {
   return getDateFilteredMarkers().filter(function(item) {
-    if (!item.lat || !item.lng || item.coordStatus !== 'OK') return false;
+    if (requireCoordOk && (!item.lat || !item.lng || item.coordStatus !== 'OK')) return false;
     if (!includeLocal && item.regionKey === '지방권') return false;
     if (activeFilter !== '전체' && item.type !== activeFilter) return false;
     if (activeZone !== '전체권역' && item.zoneName !== activeZone) return false;
@@ -312,8 +316,70 @@ function renderMarkers(items) {
 
   return html;
 }
-  function renderList(items){const list=document.getElementById('list'); if(items.length===0){list.innerHTML='<div class="memo">표시할 마커가 없습니다.</div>'; return;} const sorted=items.slice().sort((a,b)=>String(a.zoneName).localeCompare(String(b.zoneName))||String(a.regionKey).localeCompare(String(b.regionKey))||String(a.type).localeCompare(String(b.type))||String(a.storeName).localeCompare(String(b.storeName))); list.innerHTML=sorted.map(function(item){const cls=getClassName(item); return '<div class="card" onclick="focusByOrderNo(\''+escapeJs(item.orderNo)+'\')"><div class="card-top"><div class="store">'+escapeHtml(item.storeName)+'</div><div class="badge '+cls+'">'+escapeHtml(item.type)+'</div></div><div class="meta">주문번호: '+escapeHtml(item.orderNo)+'<br>출고일: '+escapeHtml(item.shipDate)+' / 수량: '+escapeHtml(String(item.qty||''))+'<br>권역: '+escapeHtml(item.zoneName||'-')+'<br>지역: '+escapeHtml(item.regionKey)+'<br>'+escapeHtml(item.address)+'</div><div class="memo">'+escapeHtml(item.memo||'')+'</div></div>';}).join('');}
-function renderZoneFrame(items){if(!map||!items||items.length===0)return; if(activeZone==='전체권역')return; const points=items.filter(item=>item.lat&&item.lng&&item.coordStatus==='OK').map(item=>({lat:Number(item.lat),lng:Number(item.lng)})); if(points.length===0)return; const center=getPointsCenter(points); const label=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(center.lat,center.lng),content:'<div class="zone-map-label">'+escapeHtml(activeZone)+'</div>',yAnchor:1.8}); label.setMap(map); zoneShapes.push(label); if(points.length===1)return; if(points.length===2){const line=new kakao.maps.Polyline({path:points.map(p=>new kakao.maps.LatLng(p.lat,p.lng)),strokeWeight:4,strokeColor:'#111827',strokeOpacity:.75,strokeStyle:'solid'}); line.setMap(map); zoneShapes.push(line); return;} const hull=getConvexHull(points); const polygon=new kakao.maps.Polygon({path:hull.map(p=>new kakao.maps.LatLng(p.lat,p.lng)),strokeWeight:3,strokeColor:'#111827',strokeOpacity:.85,strokeStyle:'solid',fillColor:'#2563eb',fillOpacity:.08}); polygon.setMap(map); zoneShapes.push(polygon);}
+
+  function renderList(items) {
+  const list = document.getElementById('list');
+
+  if (items.length === 0) {
+    list.innerHTML =
+      '<div class="memo">' +
+      '조건에 맞는 주문 카드가 없습니다.<br>' +
+      '권역/출고일/오늘확정·당겨오기·확인필요 필터를 확인하세요.' +
+      '</div>';
+    return;
+  }
+
+  const sorted = items.slice().sort(function(a, b) {
+    return String(a.zoneName).localeCompare(String(b.zoneName)) ||
+           String(a.regionKey).localeCompare(String(b.regionKey)) ||
+           String(a.type).localeCompare(String(b.type)) ||
+           String(a.storeName).localeCompare(String(b.storeName));
+  });
+
+  list.innerHTML = sorted.map(function(item) {
+    const cls = getClassName(item);
+
+    return (
+      '<div class="card" onclick="focusByOrderNo(\'' + escapeJs(item.orderNo) + '\')">' +
+        '<div class="card-top">' +
+          '<div class="store">' + escapeHtml(item.storeName) + '</div>' +
+          '<div class="badge ' + cls + '">' + escapeHtml(item.type) + '</div>' +
+        '</div>' +
+        '<div class="meta">' +
+          '주문번호: ' + escapeHtml(item.orderNo) + '<br>' +
+          '출고일: ' + escapeHtml(item.shipDate) + ' / 수량: ' + escapeHtml(String(item.qty || '')) + '<br>' +
+          '권역: ' + escapeHtml(item.zoneName || '-') + '<br>' +
+          '지역: ' + escapeHtml(item.regionKey || '-') + '<br>' +
+          '좌표: ' + escapeHtml(item.coordStatus || '-') + '<br>' +
+          escapeHtml(item.address || '') +
+        '</div>' +
+        '<div class="memo">' + escapeHtml(item.memo || '') + '</div>' +
+        '<div class="memo">' + buildProductListTextHtml(item) + '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+function buildProductListTextHtml(item) {
+  const products = item.products || [];
+
+  if (!products.length) return '';
+
+  return products.map(function(p) {
+    const missing = p.status === '미입고' ? ' [미입고]' : '';
+
+    return (
+      '· ' +
+      escapeHtml(p.productName || '') +
+      ' × ' +
+      escapeHtml(String(p.qty || '')) +
+      missing
+    );
+  }).join('<br>');
+}
+
+  
+  function renderZoneFrame(items){if(!map||!items||items.length===0)return; if(activeZone==='전체권역')return; const points=items.filter(item=>item.lat&&item.lng&&item.coordStatus==='OK').map(item=>({lat:Number(item.lat),lng:Number(item.lng)})); if(points.length===0)return; const center=getPointsCenter(points); const label=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(center.lat,center.lng),content:'<div class="zone-map-label">'+escapeHtml(activeZone)+'</div>',yAnchor:1.8}); label.setMap(map); zoneShapes.push(label); if(points.length===1)return; if(points.length===2){const line=new kakao.maps.Polyline({path:points.map(p=>new kakao.maps.LatLng(p.lat,p.lng)),strokeWeight:4,strokeColor:'#111827',strokeOpacity:.75,strokeStyle:'solid'}); line.setMap(map); zoneShapes.push(line); return;} const hull=getConvexHull(points); const polygon=new kakao.maps.Polygon({path:hull.map(p=>new kakao.maps.LatLng(p.lat,p.lng)),strokeWeight:3,strokeColor:'#111827',strokeOpacity:.85,strokeStyle:'solid',fillColor:'#2563eb',fillOpacity:.08}); polygon.setMap(map); zoneShapes.push(polygon);}
 function getPointsCenter(points){const lat=points.reduce((sum,p)=>sum+p.lat,0)/points.length; const lng=points.reduce((sum,p)=>sum+p.lng,0)/points.length; return{lat,lng};}
 function getConvexHull(points){const pts=points.slice().sort((a,b)=>a.lng===b.lng?a.lat-b.lat:a.lng-b.lng); function cross(o,a,b){return(a.lng-o.lng)*(b.lat-o.lat)-(a.lat-o.lat)*(b.lng-o.lng);} const lower=[]; pts.forEach(function(p){while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop(); lower.push(p);}); const upper=[]; for(let i=pts.length-1;i>=0;i--){const p=pts[i]; while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop(); upper.push(p);} upper.pop(); lower.pop(); return lower.concat(upper);}
 function fitBounds(items){if(!items.length)return; if(items.length===1){const item=items[0]; map.setCenter(new kakao.maps.LatLng(item.lat,item.lng)); map.setLevel(5); return;} const bounds=new kakao.maps.LatLngBounds(); items.forEach(item=>bounds.extend(new kakao.maps.LatLng(item.lat,item.lng))); map.setBounds(bounds);}
