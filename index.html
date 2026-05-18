@@ -188,6 +188,45 @@ body.labels-always .marker-wrap:hover .tip-title {
     .error { padding: 16px; color: #991b1b; background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; margin: 14px; line-height: 1.5; }
     .loading { padding: 16px; color: #374151; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; margin: 14px; line-height: 1.5; font-weight: 800; }
     @media (max-width: 900px) { .layout { grid-template-columns: 1fr; grid-template-rows: 56vh 44vh; } .panel { height: 44vh; border-left: none; border-top: 1px solid #d1d5db; } }
+
+    /* 상호명 표시 ON: 기본은 상호명만 보이게 강제 */
+body.labels-always .marker-tip {
+  opacity: 1 !important;
+  min-width: auto !important;
+  max-width: 220px !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  background: rgba(17, 24, 39, 0.86) !important;
+}
+
+/* 상호명 표시 ON: 세부내용은 기본 숨김 */
+body.labels-always .marker-tip .tip-detail {
+  display: none !important;
+}
+
+/* hover 때만 tooltip 확장 */
+body.labels-always .marker-wrap:hover .marker-tip {
+  min-width: 240px !important;
+  max-width: 340px !important;
+  white-space: normal !important;
+  text-align: left !important;
+}
+
+/* hover 때만 상품목록/세부내용 표시 */
+body.labels-always .marker-wrap:hover .marker-tip .tip-detail {
+  display: block !important;
+  margin-top: 6px;
+}
+
+/* 상호명 표시 ON 상태에서 제목 여백 줄이기 */
+body.labels-always .tip-title {
+  margin-bottom: 0 !important;
+}
+
+/* hover 시 제목 여백 복구 */
+body.labels-always .marker-wrap:hover .tip-title {
+  margin-bottom: 4px !important;
+}
   </style>
 </head>
 <body>
@@ -337,10 +376,10 @@ function renderMarkers(items) {
 
   let html = '';
 
-  // 항상 표시될 영역: 상호명만
+  // 항상 표시되는 영역: 상호명만
   html += '<div class="tip-title">' + escapeHtml(item.storeName || '') + '</div>';
 
-  // hover 시에만 표시될 영역
+  // hover 때만 표시되는 영역
   html += '<div class="tip-detail">';
 
   html +=
@@ -375,8 +414,8 @@ function renderMarkers(items) {
     html += '<div class="tip-product">외 ' + (products.length - 8) + '개 상품</div>';
   }
 
-  html += '</div>';
-  html += '</div>';
+  html += '</div>'; // tip-products
+  html += '</div>'; // tip-detail
 
   return html;
 }
