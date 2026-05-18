@@ -404,6 +404,37 @@ body.map-minimal .tree-dot {
   height: 15px !important;
 }
 
+/* 배송휴무일 걸린 주문 */
+.holiday {
+  background: #ea580c !important;
+}
+
+.badge.holiday {
+  background: #ffedd5 !important;
+  color: #9a3412 !important;
+}
+
+.tree-label.holiday-label {
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.65), 0 4px 12px rgba(0,0,0,0.28) !important;
+}
+
+.holiday-alert {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tip-holiday {
+  color: #fdba74;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
     
   </style>
 </head>
@@ -648,9 +679,10 @@ if (!labelPoint) {
 
 function buildTreeLabelHtml(item, cls) {
   const labelClass =
-    cls === 'issue' ? 'issue-label' :
-    cls === 'scheduled' ? 'scheduled-label' :
-    '';
+  cls === 'holiday' ? 'holiday-label' :
+  cls === 'issue' ? 'issue-label' :
+  cls === 'scheduled' ? 'scheduled-label' :
+  '';
 
   return (
     '<div class="tree-label ' + labelClass + '" onclick="focusByOrderNo(\'' + escapeJs(item.orderNo) + '\')">' +
@@ -666,6 +698,10 @@ function buildTreeLabelDetailHtml(item) {
 
   let html = '';
 
+  if (item.holidayCheck === '배송불가') {
+  html += '<div class="tip-holiday">배송불가일</div>';
+}
+  
   html +=
     '<div class="tip-meta">' +
       '주문번호 ' + escapeHtml(item.orderNo || '') +
@@ -867,6 +903,10 @@ function getRectOverlapArea(a, b) {
   // 항상 표시되는 영역: 상호명만
   html += '<div class="tip-title">' + escapeHtml(item.storeName || '') + '</div>';
 
+  if (item.holidayCheck === '배송불가') {
+  html += '<div class="tip-holiday">배송불가일</div>';
+}
+    
   // hover 때만 표시되는 영역
   html += '<div class="tip-detail">';
 
@@ -946,14 +986,16 @@ if (items.length === 0) {
       '<div class="card" onclick="focusByOrderNo(\'' + escapeJs(item.orderNo) + '\')">' +
         '<div class="card-top">' +
           '<div class="store">' + escapeHtml(item.storeName) + '</div>' +
-          '<div class="badge ' + cls + '">' + escapeHtml(item.type) + '</div>' +
-        '</div>' +
+'<div class="badge ' + cls + '">' +
+  escapeHtml(item.holidayCheck === '배송불가' ? '배송불가' : item.type) +
+'</div>' +        '</div>' +
         '<div class="meta">' +
           '주문번호: ' + escapeHtml(item.orderNo) + '<br>' +
           '출고일: ' + escapeHtml(item.shipDate) + ' / 수량: ' + escapeHtml(String(item.qty || '')) + '<br>' +
           '권역: ' + escapeHtml(item.zoneName || '-') + '<br>' +
           '지역: ' + escapeHtml(item.regionKey || '-') + '<br>' +
           '좌표: ' + escapeHtml(item.coordStatus || '-') + '<br>' +
+          (item.holidayCheck ? '휴무일: ' + escapeHtml(item.holidayCheck) + '<br>' : '') +
           escapeHtml(item.address || '') +
         '</div>' +
         '<div class="memo">' + escapeHtml(item.memo || '') + '</div>' +
@@ -1005,8 +1047,11 @@ function toggleLocal(){includeLocal=!includeLocal; document.getElementById('togg
 function toggleTraffic(){if(!map)return; trafficOn=!trafficOn; if(trafficOn){map.addOverlayMapTypeId(kakao.maps.MapTypeId.TRAFFIC);}else{map.removeOverlayMapTypeId(kakao.maps.MapTypeId.TRAFFIC);} document.getElementById('toggleTraffic').classList.toggle('active',trafficOn); document.getElementById('toggleTraffic').innerText=trafficOn?'교통 OFF':'교통 ON';}
 function toggleMinimalMap(){minimalMap=!minimalMap; document.body.classList.toggle('map-minimal',minimalMap); if(map&&kakao.maps.MapTypeId.USE_DISTRICT){if(minimalMap){map.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);}else{map.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);}} const btn=document.getElementById('toggleMinimal'); btn.classList.toggle('active',minimalMap); btn.innerText=minimalMap?'일반지도':'권역지도'; render();}
 function toggleLabelsAlways(){labelsAlways=!labelsAlways; document.body.classList.toggle('labels-always',labelsAlways); const btn=document.getElementById('toggleLabels'); btn.classList.toggle('active',labelsAlways); btn.innerText=labelsAlways?'상호명 숨김':'상호명 표시';}
-function getClassName(item){if(item.regionKey==='지방권')return'local'; return typeClassMap[item.type]||'unknown';}
-function safeNumber(value){return Number(value||0).toLocaleString('ko-KR');}
+function getClassName(item) {
+  if (item.holidayCheck === '배송불가') return 'holiday';
+  if (item.regionKey === '지방권') return 'local';
+  return typeClassMap[item.type] || 'unknown';
+}function safeNumber(value){return Number(value||0).toLocaleString('ko-KR');}
 function formatClientMinutes(minutes){minutes=Number(minutes)||0; const h=Math.floor(minutes/60); const m=Math.round(minutes%60); if(h>0)return h+'시간 '+m+'분'; return m+'분';}
 function showError(message){document.body.innerHTML='<div class="error">'+message+'</div>';}
 function escapeHtml(value){return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');}
