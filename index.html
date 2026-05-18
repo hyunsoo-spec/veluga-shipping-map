@@ -134,12 +134,48 @@
   white-space: nowrap;
 }
 
+/* 상호명 표시 ON일 때: 기본은 상호명만 */
 body.labels-always .marker-tip {
-  min-width: 220px;
+  opacity: 1;
+  min-width: auto;
+  max-width: 220px;
+  white-space: nowrap;
+  text-align: center;
+  background: rgba(17, 24, 39, 0.86);
 }
+
+/* 상호명 표시 ON일 때 세부내용은 기본 숨김 */
+body.labels-always .marker-tip .tip-detail {
+  display: none;
+}
+
+/* hover하면 세부내용까지 확장 */
+body.labels-always .marker-wrap:hover .marker-tip {
+  min-width: 240px;
+  max-width: 340px;
+  white-space: normal;
+  text-align: left;
+}
+
+/* hover 상태에서만 주문상품목록 노출 */
+body.labels-always .marker-wrap:hover .marker-tip .tip-detail {
+  display: block;
+  margin-top: 6px;
+}
+
+/* 상호명 라벨이 너무 커지지 않도록 */
+body.labels-always .tip-title {
+  margin-bottom: 0;
+}
+
+/* hover 상태에서는 title 아래 여백 복구 */
+body.labels-always .marker-wrap:hover .tip-title {
+  margin-bottom: 4px;
+}
+    
+
     .marker-wrap:hover .marker-tip { opacity: 1; }
     .marker-wrap:hover .marker-dot { transform: scale(1.35); box-shadow: 0 4px 12px rgba(0,0,0,.45); }
-    body.labels-always .marker-tip { opacity: 1; background: rgba(17,24,39,.86); }
     body.labels-always .marker-wrap { z-index: 40; }
     body.map-minimal #map { background: #eef2f7 !important; }
     body.map-minimal #map img { filter: grayscale(1) saturate(.15) contrast(1.15) brightness(1.18); opacity: .48 !important; }
@@ -301,7 +337,11 @@ function renderMarkers(items) {
 
   let html = '';
 
+  // 항상 표시될 영역: 상호명만
   html += '<div class="tip-title">' + escapeHtml(item.storeName || '') + '</div>';
+
+  // hover 시에만 표시될 영역
+  html += '<div class="tip-detail">';
 
   html +=
     '<div class="tip-meta">' +
@@ -312,6 +352,7 @@ function renderMarkers(items) {
 
   if (!products.length) {
     html += '<div class="tip-product">상품목록 없음</div>';
+    html += '</div>';
     return html;
   }
 
@@ -334,6 +375,7 @@ function renderMarkers(items) {
     html += '<div class="tip-product">외 ' + (products.length - 8) + '개 상품</div>';
   }
 
+  html += '</div>';
   html += '</div>';
 
   return html;
