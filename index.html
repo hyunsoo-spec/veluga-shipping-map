@@ -248,8 +248,71 @@ function getVisibleMarkers() {
   });
 }
   
-function renderMarkers(items){items.forEach(function(item){const position=new kakao.maps.LatLng(item.lat,item.lng); const cls=getClassName(item); const content='<div class="marker-wrap" onclick="focusByOrderNo(\''+escapeJs(item.orderNo)+'\')"><div class="marker-tip">'+escapeHtml(item.storeName)+'</div><div class="marker-dot '+cls+'"></div></div>'; const overlay=new kakao.maps.CustomOverlay({position:position,content:content,yAnchor:1}); overlay.setMap(map); overlays.push(overlay);});}
-function renderList(items){const list=document.getElementById('list'); if(items.length===0){list.innerHTML='<div class="memo">표시할 마커가 없습니다.</div>'; return;} const sorted=items.slice().sort((a,b)=>String(a.zoneName).localeCompare(String(b.zoneName))||String(a.regionKey).localeCompare(String(b.regionKey))||String(a.type).localeCompare(String(b.type))||String(a.storeName).localeCompare(String(b.storeName))); list.innerHTML=sorted.map(function(item){const cls=getClassName(item); return '<div class="card" onclick="focusByOrderNo(\''+escapeJs(item.orderNo)+'\')"><div class="card-top"><div class="store">'+escapeHtml(item.storeName)+'</div><div class="badge '+cls+'">'+escapeHtml(item.type)+'</div></div><div class="meta">주문번호: '+escapeHtml(item.orderNo)+'<br>출고일: '+escapeHtml(item.shipDate)+' / 수량: '+escapeHtml(String(item.qty||''))+'<br>권역: '+escapeHtml(item.zoneName||'-')+'<br>지역: '+escapeHtml(item.regionKey)+'<br>'+escapeHtml(item.address)+'</div><div class="memo">'+escapeHtml(item.memo||'')+'</div></div>';}).join('');}
+function renderMarkers(items) {
+  items.forEach(function(item) {
+    const position = new kakao.maps.LatLng(item.lat, item.lng);
+    const cls = getClassName(item);
+
+    const content =
+      '<div class="marker-wrap" onclick="focusByOrderNo(\'' + escapeJs(item.orderNo) + '\')">' +
+        '<div class="marker-tip">' + buildMarkerTooltipHtml(item) + '</div>' +
+        '<div class="marker-dot ' + cls + '"></div>' +
+      '</div>';
+
+    const overlay = new kakao.maps.CustomOverlay({
+      position: position,
+      content: content,
+      yAnchor: 1
+    });
+
+    overlay.setMap(map);
+    overlays.push(overlay);
+  });
+}
+
+  function buildMarkerTooltipHtml(item) {
+  const products = item.products || [];
+
+  let html = '';
+
+  html += '<div class="tip-title">' + escapeHtml(item.storeName || '') + '</div>';
+
+  html +=
+    '<div class="tip-meta">' +
+      '주문번호 ' + escapeHtml(item.orderNo || '') +
+      ' / 출고일 ' + escapeHtml(item.shipDate || '') +
+      ' / ' + escapeHtml(item.type || '') +
+    '</div>';
+
+  if (!products.length) {
+    html += '<div class="tip-product">상품목록 없음</div>';
+    return html;
+  }
+
+  html += '<div class="tip-products">';
+
+  products.slice(0, 8).forEach(function(p) {
+    const isMissing = p.status === '미입고';
+
+    html +=
+      '<div class="tip-product">' +
+        '<div class="tip-product-name">' +
+          escapeHtml(p.productName || '') +
+          (isMissing ? '<span class="tip-missing">[미입고]</span>' : '') +
+        '</div>' +
+        '<div class="tip-product-qty">× ' + escapeHtml(String(p.qty || '')) + '</div>' +
+      '</div>';
+  });
+
+  if (products.length > 8) {
+    html += '<div class="tip-product">외 ' + (products.length - 8) + '개 상품</div>';
+  }
+
+  html += '</div>';
+
+  return html;
+}
+  function renderList(items){const list=document.getElementById('list'); if(items.length===0){list.innerHTML='<div class="memo">표시할 마커가 없습니다.</div>'; return;} const sorted=items.slice().sort((a,b)=>String(a.zoneName).localeCompare(String(b.zoneName))||String(a.regionKey).localeCompare(String(b.regionKey))||String(a.type).localeCompare(String(b.type))||String(a.storeName).localeCompare(String(b.storeName))); list.innerHTML=sorted.map(function(item){const cls=getClassName(item); return '<div class="card" onclick="focusByOrderNo(\''+escapeJs(item.orderNo)+'\')"><div class="card-top"><div class="store">'+escapeHtml(item.storeName)+'</div><div class="badge '+cls+'">'+escapeHtml(item.type)+'</div></div><div class="meta">주문번호: '+escapeHtml(item.orderNo)+'<br>출고일: '+escapeHtml(item.shipDate)+' / 수량: '+escapeHtml(String(item.qty||''))+'<br>권역: '+escapeHtml(item.zoneName||'-')+'<br>지역: '+escapeHtml(item.regionKey)+'<br>'+escapeHtml(item.address)+'</div><div class="memo">'+escapeHtml(item.memo||'')+'</div></div>';}).join('');}
 function renderZoneFrame(items){if(!map||!items||items.length===0)return; if(activeZone==='전체권역')return; const points=items.filter(item=>item.lat&&item.lng&&item.coordStatus==='OK').map(item=>({lat:Number(item.lat),lng:Number(item.lng)})); if(points.length===0)return; const center=getPointsCenter(points); const label=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(center.lat,center.lng),content:'<div class="zone-map-label">'+escapeHtml(activeZone)+'</div>',yAnchor:1.8}); label.setMap(map); zoneShapes.push(label); if(points.length===1)return; if(points.length===2){const line=new kakao.maps.Polyline({path:points.map(p=>new kakao.maps.LatLng(p.lat,p.lng)),strokeWeight:4,strokeColor:'#111827',strokeOpacity:.75,strokeStyle:'solid'}); line.setMap(map); zoneShapes.push(line); return;} const hull=getConvexHull(points); const polygon=new kakao.maps.Polygon({path:hull.map(p=>new kakao.maps.LatLng(p.lat,p.lng)),strokeWeight:3,strokeColor:'#111827',strokeOpacity:.85,strokeStyle:'solid',fillColor:'#2563eb',fillOpacity:.08}); polygon.setMap(map); zoneShapes.push(polygon);}
 function getPointsCenter(points){const lat=points.reduce((sum,p)=>sum+p.lat,0)/points.length; const lng=points.reduce((sum,p)=>sum+p.lng,0)/points.length; return{lat,lng};}
 function getConvexHull(points){const pts=points.slice().sort((a,b)=>a.lng===b.lng?a.lat-b.lat:a.lng-b.lng); function cross(o,a,b){return(a.lng-o.lng)*(b.lat-o.lat)-(a.lat-o.lat)*(b.lng-o.lng);} const lower=[]; pts.forEach(function(p){while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop(); lower.push(p);}); const upper=[]; for(let i=pts.length-1;i>=0;i--){const p=pts[i]; while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop(); upper.push(p);} upper.pop(); lower.pop(); return lower.concat(upper);}
