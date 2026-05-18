@@ -365,6 +365,45 @@ body.map-minimal .tree-label,
 body.map-minimal .marker-tip {
   background: rgba(17, 24, 39, 0.94) !important;
 }
+
+/* FINAL: 적재확인용 전체 라벨 표시 보정 */
+.tree-label {
+  padding: 4px 7px !important;
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+  border-radius: 8px !important;
+  max-width: 210px !important;
+}
+
+.tree-label .tip-title {
+  max-width: 190px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.tree-label:hover {
+  max-width: 360px !important;
+  z-index: 99999 !important;
+}
+
+.tree-label:hover .tip-title {
+  max-width: 330px !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}
+
+.tree-dot {
+  width: 14px !important;
+  height: 14px !important;
+  border-width: 3px !important;
+}
+
+body.map-minimal .tree-dot {
+  width: 15px !important;
+  height: 15px !important;
+}
+
     
   </style>
 </head>
@@ -667,23 +706,8 @@ function getLabelPriority(item) {
 
 
 function getTreeLabelLimit(items) {
-  const level = map ? map.getLevel() : 8;
-
-  // Kakao map level: 숫자가 클수록 더 줌아웃
-  if (activeZone === '전체권역') {
-    if (level >= 9) return Math.min(14, items.length);
-    if (level >= 8) return Math.min(18, items.length);
-    if (level >= 7) return Math.min(24, items.length);
-    if (level >= 6) return Math.min(32, items.length);
-    return Math.min(42, items.length);
-  }
-
-  // 권역 선택 상태에서는 조금 더 많이 허용
-  if (level >= 9) return Math.min(16, items.length);
-  if (level >= 8) return Math.min(22, items.length);
-  if (level >= 7) return Math.min(32, items.length);
-  if (level >= 6) return Math.min(45, items.length);
-  return Math.min(65, items.length);
+  // 적재확인용: 현재 필터에 걸린 착지는 전부 라벨 표시
+  return items.length;
 }
 
 
@@ -695,17 +719,16 @@ function estimateLabelSize(name) {
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
 
-    // 영문/숫자는 좁게, 한글은 넓게 계산
-    if (/[a-zA-Z0-9\s\-\_\(\)]/.test(ch)) {
-      widthScore += 7.2;
+    if (/[a-zA-Z0-9\s\-\_\(\)\/]/.test(ch)) {
+      widthScore += 6.2;
     } else {
-      widthScore += 13.5;
+      widthScore += 11.5;
     }
   }
 
   return {
-    w: Math.min(Math.max(96, widthScore + 44), 260),
-    h: 36
+    w: Math.min(Math.max(72, widthScore + 30), 220),
+    h: 28
   };
 }
 
@@ -713,16 +736,23 @@ function estimateLabelSize(name) {
 function findNonOverlappingLabelPoint(point, size, placedRects) {
   const directions = [
     [0, -1],
-    [1, -0.75],
-    [-1, -0.75],
+    [0.55, -0.95],
+    [1, -0.7],
     [1, 0],
+    [1, 0.7],
+    [0.55, 0.95],
+    [0, 1],
+    [-0.55, 0.95],
+    [-1, 0.7],
     [-1, 0],
-    [1, 0.75],
-    [-1, 0.75],
-    [0, 1]
+    [-1, -0.7],
+    [-0.55, -0.95]
   ];
 
-  const distances = [44, 68, 96, 130, 170, 216, 270];
+  const distances = [30, 44, 62, 84, 112, 148, 190, 240, 300, 370, 450];
+
+  let bestCandidate = null;
+  let bestScore = Infinity;
 
   for (let d = 0; d < distances.length; d++) {
     const dist = distances[d];
@@ -737,20 +767,33 @@ function findNonOverlappingLabelPoint(point, size, placedRects) {
 
       const rect = makeRectFromCenter(candidate.x, candidate.y, size.w, size.h);
 
-      // 화면 밖으로 나가는 라벨 제외
       if (!isRectInsideMap(rect)) continue;
 
-      const hasCollision = placedRects.some(function(existing) {
-        return rectsOverlap(rect, existing, 16);
+      let collisionScore = 0;
+
+      placedRects.forEach(function(existing) {
+        if (rectsOverlap(rect, existing, 10)) {
+          collisionScore += getRectOverlapArea(rect, existing);
+        }
       });
 
-      if (!hasCollision) {
+      // 충돌 없는 자리면 바로 채택
+      if (collisionScore === 0) {
         return candidate;
+      }
+
+      // 모든 자리가 충돌하면, 가장 덜 겹치는 자리라도 사용
+      const distancePenalty = dist * 0.02;
+      const score = collisionScore + distancePenalty;
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestCandidate = candidate;
       }
     }
   }
 
-  return null;
+  return bestCandidate;
 }
 
 function isRectInsideMap(rect) {
@@ -792,6 +835,13 @@ function rectsOverlap(a, b, pad) {
   );
 }
 
+function getRectOverlapArea(a, b) {
+  const xOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+  const yOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+
+  return xOverlap * yOverlap;
+}
+  
   
   function buildMarkerTooltipHtml(item) {
   const products = item.products || [];
