@@ -177,9 +177,35 @@ body.labels-always .marker-wrap:hover .tip-title {
     .marker-wrap:hover .marker-tip { opacity: 1; }
     .marker-wrap:hover .marker-dot { transform: scale(1.35); box-shadow: 0 4px 12px rgba(0,0,0,.45); }
     body.labels-always .marker-wrap { z-index: 40; }
-    body.map-minimal #map { background: #eef2f7 !important; }
-    body.map-minimal #map img { filter: grayscale(1) saturate(.15) contrast(1.15) brightness(1.18); opacity: .48 !important; }
-    body.map-minimal .marker-dot { width: 19px; height: 19px; border: 3px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,.45); }
+    body.map-minimal #map {
+  background: #f3f4f6 !important;
+}
+
+/* 배송기사용 권역지도: 너무 흐리지 않게, 도로/구역감은 살림 */
+body.map-minimal #map img {
+  filter: grayscale(1) saturate(0.22) contrast(1.28) brightness(1.04);
+  opacity: 0.72 !important;
+}
+
+/* 포인트는 지도보다 확실히 위로 */
+body.map-minimal .marker-dot,
+body.map-minimal .tree-dot {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #ffffff;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.46);
+}
+
+/* 권역지도에서는 연결선을 조금 더 명확하게 */
+body.map-minimal .tree-label {
+  background: rgba(17, 24, 39, 0.94);
+}
+
+body.map-minimal .zone-map-label {
+  background: rgba(17, 24, 39, 0.94);
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.45);
+}
     .zone-map-label { background: rgba(17,24,39,.92); color: #fff; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 900; white-space: nowrap; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
     .today { background: #16a34a; } .pull { background: #2563eb; } .issue { background: #dc2626; } .local { background: #f59e0b; color: #111827; } .unknown { background: #6b7280; }
     .scheduled { background: #7c3aed; }
@@ -315,7 +341,30 @@ body.labels-always .marker-wrap:hover .tip-title {
 .tree-hidden-dot {
   z-index: 30;
 }
-    
+
+
+    /* FINAL: 배송기사용 권역지도 보정 */
+body.map-minimal #map {
+  background: #f3f4f6 !important;
+}
+
+body.map-minimal #map img {
+  filter: grayscale(1) saturate(0.22) contrast(1.28) brightness(1.04) !important;
+  opacity: 0.72 !important;
+}
+
+body.map-minimal .marker-dot,
+body.map-minimal .tree-dot {
+  width: 18px !important;
+  height: 18px !important;
+  border: 3px solid #ffffff !important;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.46) !important;
+}
+
+body.map-minimal .tree-label,
+body.map-minimal .marker-tip {
+  background: rgba(17, 24, 39, 0.94) !important;
+}
     
   </style>
 </head>
