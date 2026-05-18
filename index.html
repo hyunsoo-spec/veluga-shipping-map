@@ -84,6 +84,59 @@
     .marker-wrap { position: relative; width: 18px; height: 18px; cursor: pointer; z-index: 20; }
     .marker-dot { width: 16px; height: 16px; border-radius: 999px; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); transition: transform .12s ease, box-shadow .12s ease; }
     .marker-tip { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); background: #111827; color: #fff; font-size: 12px; font-weight: 900; padding: 6px 8px; border-radius: 8px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s ease; box-shadow: 0 4px 12px rgba(0,0,0,.25); z-index: 9999; }
+    .marker-tip {
+  min-width: 240px;
+  max-width: 340px;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.tip-title {
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.tip-meta {
+  font-size: 10px;
+  opacity: 0.85;
+  margin-bottom: 7px;
+}
+
+.tip-products {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tip-product {
+  font-size: 11px;
+  line-height: 1.25;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tip-product-name {
+  flex: 1;
+}
+
+.tip-product-qty {
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.tip-missing {
+  color: #fecaca;
+  font-weight: 900;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+body.labels-always .marker-tip {
+  min-width: 220px;
+}
     .marker-wrap:hover .marker-tip { opacity: 1; }
     .marker-wrap:hover .marker-dot { transform: scale(1.35); box-shadow: 0 4px 12px rgba(0,0,0,.45); }
     body.labels-always .marker-tip { opacity: 1; background: rgba(17,24,39,.86); }
