@@ -284,6 +284,39 @@ body.labels-always .marker-wrap:hover .tip-title {
 .tree-hidden-dot {
   opacity: 0.95;
 }
+
+/* tree 라벨은 기본 상태에서 한 줄로 정리 */
+.tree-label {
+  max-width: 240px !important;
+  overflow: hidden;
+}
+
+.tree-label .tip-title {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* hover하면 상세 확인 */
+.tree-label:hover {
+  max-width: 360px !important;
+  overflow: visible;
+  z-index: 99999;
+}
+
+.tree-label:hover .tip-title {
+  max-width: 320px;
+  white-space: normal;
+  overflow: visible;
+}
+
+/* 연결선이 너무 튀지 않게 */
+.tree-hidden-dot {
+  z-index: 30;
+}
+    
+    
   </style>
 </head>
 <body>
@@ -585,23 +618,45 @@ function getLabelPriority(item) {
 
 
 function getTreeLabelLimit(items) {
+  const level = map ? map.getLevel() : 8;
+
+  // Kakao map level: 숫자가 클수록 더 줌아웃
   if (activeZone === '전체권역') {
-    if (items.length > 60) return 24;
-    if (items.length > 35) return 30;
-    return 40;
+    if (level >= 9) return Math.min(14, items.length);
+    if (level >= 8) return Math.min(18, items.length);
+    if (level >= 7) return Math.min(24, items.length);
+    if (level >= 6) return Math.min(32, items.length);
+    return Math.min(42, items.length);
   }
 
-  if (items.length > 50) return 38;
-  return 60;
+  // 권역 선택 상태에서는 조금 더 많이 허용
+  if (level >= 9) return Math.min(16, items.length);
+  if (level >= 8) return Math.min(22, items.length);
+  if (level >= 7) return Math.min(32, items.length);
+  if (level >= 6) return Math.min(45, items.length);
+  return Math.min(65, items.length);
 }
 
 
 function estimateLabelSize(name) {
-  const len = String(name || '').length;
+  const text = String(name || '');
+
+  let widthScore = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    // 영문/숫자는 좁게, 한글은 넓게 계산
+    if (/[a-zA-Z0-9\s\-\_\(\)]/.test(ch)) {
+      widthScore += 7.2;
+    } else {
+      widthScore += 13.5;
+    }
+  }
 
   return {
-    w: Math.min(Math.max(72, len * 8 + 28), 190),
-    h: 30
+    w: Math.min(Math.max(96, widthScore + 44), 260),
+    h: 36
   };
 }
 
@@ -609,16 +664,16 @@ function estimateLabelSize(name) {
 function findNonOverlappingLabelPoint(point, size, placedRects) {
   const directions = [
     [0, -1],
-    [1, -0.7],
+    [1, -0.75],
+    [-1, -0.75],
     [1, 0],
-    [1, 0.7],
-    [0, 1],
-    [-1, 0.7],
     [-1, 0],
-    [-1, -0.7]
+    [1, 0.75],
+    [-1, 0.75],
+    [0, 1]
   ];
 
-  const distances = [34, 52, 72, 96, 124, 154];
+  const distances = [44, 68, 96, 130, 170, 216, 270];
 
   for (let d = 0; d < distances.length; d++) {
     const dist = distances[d];
@@ -633,8 +688,11 @@ function findNonOverlappingLabelPoint(point, size, placedRects) {
 
       const rect = makeRectFromCenter(candidate.x, candidate.y, size.w, size.h);
 
+      // 화면 밖으로 나가는 라벨 제외
+      if (!isRectInsideMap(rect)) continue;
+
       const hasCollision = placedRects.some(function(existing) {
-        return rectsOverlap(rect, existing, 6);
+        return rectsOverlap(rect, existing, 16);
       });
 
       if (!hasCollision) {
@@ -646,7 +704,24 @@ function findNonOverlappingLabelPoint(point, size, placedRects) {
   return null;
 }
 
+function isRectInsideMap(rect) {
+  const mapEl = document.getElementById('map');
 
+  if (!mapEl) return true;
+
+  const w = mapEl.clientWidth;
+  const h = mapEl.clientHeight;
+  const margin = 10;
+
+  return (
+    rect.left >= margin &&
+    rect.right <= w - margin &&
+    rect.top >= margin &&
+    rect.bottom <= h - margin
+  );
+}
+
+  
 function makeRectFromCenter(x, y, w, h) {
   return {
     left: x - w / 2,
